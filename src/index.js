@@ -13,3 +13,9 @@ connectDB()
 .catch((error)=>{
     console.log("Mongo DB Connection Error : ", error)
 })
+
+
+//import routers
+import userRouter from './routes/user.routes.js'
+
+app.use("/api/v1/users", userRouter)

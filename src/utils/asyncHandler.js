@@ -1,8 +1,8 @@
-const asyncHandler = async (functionWrapper) => {
-    (req, res, next) => {
-        Promise.resolve(func(req, res, next)).catch((error)=>{
-            next(error)
-        })
+const asyncHandler = (functionWrapper) => {
+    return (req, res, next) => {
+        Promise
+        .resolve(functionWrapper(req, res, next))
+        .catch((error) => next(error))
     }
 }
 
