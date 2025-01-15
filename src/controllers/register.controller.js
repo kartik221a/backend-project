@@ -22,14 +22,12 @@ const registerUser = asyncHandler( async (req, res) => {
     const {fullName, username, email, password} = req.body
 
     /* step 2: validation - not empty */
-    if([fullName, username, email, password].some((field)=>{
-        field?.trim() === ""
-    })){
+    if([fullName, username, email, password].some((field)=> (field?.trim() === ""))){
         throw new ApiError(400, "All fields are required!")
     }
     
     /* step 3: check if user already exist (username and email) */
-    const userExists = User.findOne({
+    const userExists = await User.findOne({
         $or: [{ username },{ email }]
     })
 
@@ -38,20 +36,30 @@ const registerUser = asyncHandler( async (req, res) => {
     }
 
     /* step 4: check for images */
-    const avatarLocalPath = await req.files?.avatar[0].path
-    const coverImageLocalPath = await req.files?.coverImage[0].path
+    const avatarLocalPath = await req.files?.avatar[0]?.path;
+    let coverImageLocalPath;
+
+    if(req.files && Array.isArray(req.files.coverImage) && req.files.coverImage.length > 0){
+        coverImageLocalPath = await req.files?.coverImage[0]?.path;
+    } else{
+        coverImageLocalPath = ""
+    }
 
     if(!avatarLocalPath){
-        throw new ApiError(400, "Avatar file is required")
+        throw new ApiError(400, "Avatar file is required - (local)")
     }
 
     /* step 5: upload images to cloudinary  */
     const avatar = await uploadOnCloudinary(avatarLocalPath)
-    const coverImage = await uploadOnCloudinary(cloudImageLocalPath)
+
+
+
+    const coverImage = await uploadOnCloudinary(coverImageLocalPath)
+    
 
     /* step 6: check succussfully upload on cloudinary */
-    if(!avatar){
-        throw new ApiError(400, "Avatar file is required")
+    if(!avatar?.url){
+        throw new ApiError(400, "Avatar file is required - (cloudinary)")
     }
 
     /* step 7: create user object - create entry in db */
@@ -65,7 +73,7 @@ const registerUser = asyncHandler( async (req, res) => {
     })
 
     /* step 8: remove pasword and refresh token field from response */
-    const createdUser = await user.findById(user._id).select(
+    const createdUser = await User.findById(user._id).select(
         "-password -refreshToken"
     )
 
