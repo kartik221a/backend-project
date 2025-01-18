@@ -4,6 +4,7 @@ import { ApiResponse } from "../utils/ApiResponse.js";
 import { User } from "../models/user.model.js";
 import { uploadOnCloudinary } from "../utils/cloudinary.js";
 import jwt from 'jsonwebtoken'
+import mongoose from "mongoose";
 
 const cookieOptions = {
     httpOnly: true,
@@ -215,13 +216,6 @@ const logoutUser = asyncHandler(async (req, res) => {
         }
     )
 
-    // const cookieOptions = {
-    //     httpOnly: true,
-    //     secure: true
-    // }
-    const cookieOptions = {
-        httpOnly: true
-    }
 
     return res
     .status(200)
@@ -238,7 +232,7 @@ const logoutUser = asyncHandler(async (req, res) => {
 const refreshAccessToken = asyncHandler(async (req, res) => {
     try {
         const incomingRefreshToken = req.cookies?.refreshToken || req.body.refreshToken
-    
+
         if(!incomingRefreshToken){
             throw new ApiError(401, "Unauthorized request")
         }
@@ -251,7 +245,7 @@ const refreshAccessToken = asyncHandler(async (req, res) => {
             throw new ApiError(401, "Invalid refresh token")
         }
     
-        if(user.refreshToken !== decodedToken){
+        if(user.refreshToken !== incomingRefreshToken){
             throw new ApiError(401, "The access token is either used or expired")
         }
     
@@ -306,7 +300,7 @@ const changeCurrentPassword = asyncHandler(async (req, res) => {``
 const getCurrentUser = asyncHandler(async (req, res) => {
     return res
     .status(200)
-    .res(
+    .json(
         new ApiResponse(200, req.user, "current user fetched successfully"
         )
     )
@@ -366,7 +360,7 @@ const updateUserAvatar = asyncHandler(async (req, res) => {
 
     return res
     .status(200)
-    .res(
+    .json(
         new ApiResponse(200, user, "Avatar updated successfully")
     )
 })
@@ -420,7 +414,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
             $lookup: {
                 from: "subscriptions",
                 localField: "_id",
-                foriegnField: "channel",
+                foreignField: "channel",
                 as: "subscribers"
             }
         },
@@ -428,7 +422,7 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
             $lookup: {
                 from: "subscriptions",
                 localField: "_id",
-                foriegnField: "subscriber",
+                foreignField: "subscriber",
                 as: "subscribedTo"
             }
         },
@@ -476,6 +470,55 @@ const getUserChannelProfile = asyncHandler(async (req, res) => {
 
 })
 
+
+const getWatchHistory = asyncHandler(async (req, res) => {
+    const user = await User.aggregate([
+        {
+            $match: {
+                _id: new mongoose.Types.ObjectId(req.user?._id)
+            }
+        },
+        {
+            $lookup: {
+                from: "videos",
+                localField: "watchHistory",
+                foreignField: "_id ",
+                as: "watchHistory",
+                pipeline: [
+                    {
+                        $lookup: {
+                            from: "users",
+                            localField: "owner",
+                            foreignField: "_id",
+                            as: "owner",
+                            pipeline: [
+                                {
+                                    $project: {
+                                        fullName: 1,
+                                        username: 1,
+                                        avatar: 1,
+                                    }
+                                }
+                            ]
+                        }
+                    },
+                    {
+                        $addFields: {
+                            owner: { $first: "$owner" }
+                        }
+                    }
+                ]
+            }
+        }
+    ])
+
+    return res
+    .status(200)
+    .json(
+        new ApiResponse(200, user[0].watchHistory, "watch history fetched successfully")
+    )
+})
+
 export {
     registerUser,
     loginUser,
@@ -486,5 +529,6 @@ export {
     updateAccountDetails,
     updateUserAvatar,
     updateUserCoverImage,
-    getUserChannelProfile
+    getUserChannelProfile,
+    getWatchHistory
 }
